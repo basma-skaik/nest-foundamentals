@@ -1,41 +1,42 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { UserEntity } from "./user.entity";
-import { UpdateUserDto } from "./dto/update-user.dto";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { v4 as uuid } from "uuid"
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class UserService {
+  constructor(@InjectRepository(UserEntity) private repo: Repository<UserEntity>) { }
 
-  private users: UserEntity[] = [];
-
-  findUsers(): UserEntity[] {
-    return this.users
+  findUsers(email: string) {
+    return this.repo.findBy({ email });
   }
 
-  findUserById(id: string): UserEntity {
-    return this.users.find((user) => user.id === id)
+  findUserById(id: string) {
+    return this.repo.findOneBy({ id })
   }
 
-  createUser(createUserDto: CreateUserDto): UserEntity {
-    const newUser: UserEntity = {
-      ...createUserDto,
-      id: uuid(),
+  createUser(username: string, age: number, email: string) {
+    const newUser = this.repo.create({ username, age, email })
+
+    return this.repo.save(newUser)
+  }
+
+  async updateUser(id: string, attrs: Partial<UserEntity>) {
+    const user = await this.repo.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException('user not found!')
     }
-    this.users.push(newUser)
-    return newUser
+    Object.assign(user, attrs);
+    return this.repo.save(user);
   }
 
-  updateUser(id: string, updateUserDto: UpdateUserDto): UserEntity {
-    // 1) Find the element index that u want to update
-    const index = this.users.findIndex((user) => user.id === id)
-    // 2) Update the element
-    this.users[index] = { ...this.users[index], ...updateUserDto }
-    return this.users[index]
-  }
+  async deleteUser(id: string) {
+    const user = await this.repo.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException('user not found!')
+    }
 
-  deleteUser(id: string): void {
-    this.users = this.users.filter((user) => user.id !== id)
+    return this.repo.remove(user)
   }
 
 }
